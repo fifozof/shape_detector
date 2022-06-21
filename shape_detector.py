@@ -1,26 +1,23 @@
 import time
 import math
 import serial
-
+import matplotlib.pyplot as plt
 
 def detect():
-    ax = []
-    ay = []
-    tim = [0]
-    act_acc_x = []
-    act_acc_y = []
-    ser = serial.Serial('COM6', 9600)
+    ser = serial.Serial('COM5', 9600) #komunikacja szeregowa z akcelerometrem
     values = [0, 0, 0]
+    ax_list = []
+    ay_list = []
+    ax_actual = 0
+    ay_actual = 0
+    ax_previous = 0
+    ay_previous = 0
     vx = 0
     vy = 0
-    mag_v = [0]
-    m_acc_x = 0
-    m_acc_y = 0
-    m_acc_last_x = 0
-    m_acc_last_y = 0
-    vx_vec = [0]
-    vy_vec = [0]
-    pretty_constant = 0
+    vx_list = [0]
+    vy_list = [0]
+    magnitude_v = [0]
+    low_value = 0
     angles = -1
     s_time = time.time()
     for m in range(5):
@@ -29,10 +26,10 @@ def detect():
         data = data.strip()
         values = data.split(" ")
         values = [float(v) for v in values]
-        act_acc_x.append((values[0]) * 0.2)
-        act_acc_y.append((values[1]) * 0.2)
-    m_acc_last_x = sum(act_acc_x)
-    m_acc_last_y = sum(act_acc_y)
+        ax_list.append((values[0]) * 0.2)
+        ay_list.append((values[1]) * 0.2)
+    ax_previous = sum(ax_list)
+    ay_previous = sum(ay_list)
     for i in range(400):
         s_time = time.time()
         data = ser.readline()
@@ -40,21 +37,22 @@ def detect():
         data = data.strip()
         values = data.split(" ")
         values = [float(v) for v in values]
-        act_acc_x.append((values[0]) * 0.2)
-        act_acc_y.append((values[1]) * 0.2)
-        m_acc_x = act_acc_x[i] + act_acc_x[i + 1] + act_acc_x[i + 2] + act_acc_x[i + 3] + act_acc_x[i + 4]
-        m_acc_y = act_acc_y[i] + act_acc_y[i + 1] + act_acc_y[i + 2] + act_acc_y[i + 3] + act_acc_y[i + 4]
-        vx = (m_acc_x + m_acc_last_x) * 2 / (time.time() - s_time)
-        vy = (m_acc_y + m_acc_last_y) * 2 / (time.time() - s_time)
-        vx_vec.append(vx + vx_vec[i])
-        vy_vec.append(vy + vy_vec[i])
-        mag_v.append(math.sqrt(vx*vx + vy*vy))
-        tim.append(tim[i] + time.time() - s_time)
-        if i > 4:
-            if (mag_v[i - 1] - 20 < mag_v[i] < mag_v[i - 1] + 20) and (mag_v[i - 2] - 20 < mag_v[i] < mag_v[i - 2] + 20) and (mag_v[i - 3] - 20 < mag_v[i] < mag_v[i - 3] + 20) and (mag_v[i - 4] - 20 < mag_v[i] < mag_v[i - 4] + 20):
-                pretty_constant += 1
-            else:
-                pretty_constant = 0
-            if pretty_constant == 20:
-                angles += 1
+        #Średnia krocząca
+        ax_list.append((values[0]) * 0.2)
+        ay_list.append((values[1]) * 0.2)
+        ax_actual = ax_list[i] + ax_list[i + 1] + ax_list[i + 2] + ax_list[i + 3] + ax_list[i + 4]
+        ay_actual = ay_list[i] + ay_list[i + 1] + ay_list[i + 2] + ay_list[i + 3] + ay_list[i + 4]
+        #Całkowanie metodą trapezów w celu otrzymania prędkości
+        vx = (ax_actual + ax_previous) * 2 / (time.time() - s_time)
+        vy = (ay_actual + ay_previous) * 2 / (time.time() - s_time)
+        vx_list.append(vx + vx_list[i])
+        vy_list.append(vy + vy_list[i])
+        magnitude_v.append(math.sqrt(vx*vx + vy*vy))
+        #Zliczanie ilości kątów narysowanej figury
+        if (magnitude_v[i] < 30):
+            low_value += 1
+        else:
+            low_value = 0
+        if low_value == 15:
+            angles += 1
     return angles
